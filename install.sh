@@ -58,6 +58,6 @@ qemu-system-x86_64 \
   -drive file="$WORK/unattend.iso",media=cdrom,if=none,id=cd1 \
   -device ide-cd,drive=cd1,bus=ahci0.2 \
   -nic none \
-  -boot once=d -nographic -serial mon:stdio -vnc :1
+  -boot once=d -nographic -serial mon:stdio -vnc 127.0.0.1:1
 
 echo "QEMU exited. Run $SCRIPT_DIR/verify.sh $DISK to confirm before shipping the disk."
