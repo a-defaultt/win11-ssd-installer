@@ -53,6 +53,10 @@
 
       <ImageInstall>
         <OSImage>
+          <!-- Index 6 was verified against THIS ISO's install.wim XML metadata
+               (EDITIONID=Professional, i.e. Windows 11 Pro). It will NOT
+               necessarily be correct for a different ISO - re-check the image
+               list before reusing this answer file. -->
           <InstallFrom><MetaData wcm:action="add"><Key>/IMAGE/INDEX</Key><Value>6</Value></MetaData></InstallFrom>
           <InstallTo><DiskID>0</DiskID><PartitionID>3</PartitionID></InstallTo>
         </OSImage>
@@ -89,6 +93,9 @@
           </LocalAccount>
         </LocalAccounts>
       </UserAccounts>
+      <!-- Deliberate one-shot login (LogonCount=1), used only to run the
+           FirstLogonCommands shutdown below. Every subsequent boot requires
+           the normal password login. -->
       <AutoLogon>
         <Enabled>true</Enabled>
         <LogonCount>1</LogonCount>
@@ -101,7 +108,7 @@
           <CommandLine>cmd /c shutdown /s /t 10</CommandLine>
         </SynchronousCommand>
       </FirstLogonCommands>
-      <TimeZone>UTC</TimeZone>
+      <TimeZone>Romance Standard Time</TimeZone>
     </component>
   </settings>
 
