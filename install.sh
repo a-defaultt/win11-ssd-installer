@@ -6,7 +6,7 @@ DISK="${1:?usage: install.sh /dev/sdX iso}"
 ISO="${2:?usage: install.sh /dev/sdX iso}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORK="$(mktemp -d)"
-trap '[ -f "$WORK/swtpm.pid" ] && kill "$(cat "$WORK/swtpm.pid")" 2>/dev/null; rm -rf "$WORK"' EXIT
+trap 'if [ -f "$WORK/swtpm.pid" ]; then kill "$(cat "$WORK/swtpm.pid")" 2>/dev/null || true; fi; rm -rf "$WORK"' EXIT
 
 for bin in qemu-system-x86_64 swtpm genisoimage sgdisk blkdiscard; do
   command -v "$bin" >/dev/null || { echo "Missing required tool: $bin"; exit 1; }
