@@ -6,27 +6,34 @@ DISK="${1:?usage: install.sh /dev/sdX iso}"
 ISO="${2:?usage: install.sh /dev/sdX iso}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORK="$(mktemp -d)"
-trap 'if [ -f "$WORK/swtpm.pid" ]; then kill "$(cat "$WORK/swtpm.pid")" 2>/dev/null || true; fi; rm -rf "$WORK"' EXIT
+trap 'if [ -f "$WORK/swtpm.pid" ]; then kill "$(cat "$WORK/swtpm.pid")" 2>/dev/null || true; fi; rm -rf "$WORK"' EXIT INT TERM
+
+[ "$EUID" -eq 0 ] || { echo "Run as root (sudo) — raw disk access requires it"; exit 1; }
 
 for bin in qemu-system-x86_64 swtpm genisoimage sgdisk blkdiscard; do
   command -v "$bin" >/dev/null || { echo "Missing required tool: $bin"; exit 1; }
 done
 [ -f /usr/share/OVMF/OVMF_CODE_4M.secboot.fd ] || { echo "Missing OVMF secure-boot firmware"; exit 1; }
 [ -f /usr/share/OVMF/OVMF_VARS_4M.ms.fd ] || { echo "Missing OVMF vars template"; exit 1; }
+[ -f "$SCRIPT_DIR/unattend.xml" ] || { echo "Missing unattend.xml next to install.sh"; exit 1; }
 [ -f "$ISO" ] || { echo "ISO not found: $ISO"; exit 1; }
 [ -b "$DISK" ] || { echo "Not a block device: $DISK"; exit 1; }
 
 lsblk -no TRAN "$DISK" | grep -q usb || { echo "Refusing: $DISK is not USB-attached"; exit 1; }
+[ -z "$(lsblk -no MOUNTPOINT "$DISK" | tr -d '[:space:]')" ] || { echo "Refusing: $DISK has mounted filesystems"; exit 1; }
 echo "Target: $DISK ($(lsblk -no SIZE "$DISK") on $(lsblk -no MODEL "$DISK"))"
 read -rp "This WIPES $DISK completely. Type 'yes' to continue: " OK
 [ "$OK" = yes ] || exit 1
 
+# Build the answer-file ISO before touching the disk, so a genisoimage failure
+# leaves the target untouched. Setup's windowsPE implicit search only looks for
+# autounattend.xml at the root of removable media.
+mkdir -p "$WORK/unattend_src"
+cp "$SCRIPT_DIR/unattend.xml" "$WORK/unattend_src/autounattend.xml"
+genisoimage -o "$WORK/unattend.iso" -J -R -V UNATTEND "$WORK/unattend_src" >/dev/null
+
 wipefs -a "$DISK"
 blkdiscard -f "$DISK" 2>/dev/null || sgdisk --zap-all "$DISK"
-
-mkdir -p "$WORK/unattend_src"
-cp "$SCRIPT_DIR/unattend.xml" "$WORK/unattend_src/"
-genisoimage -o "$WORK/unattend.iso" -J -R -V UNATTEND "$WORK/unattend_src" >/dev/null
 
 mkdir -p "$WORK/tpm"
 swtpm socket --tpmstate dir="$WORK/tpm" \
@@ -34,6 +41,8 @@ swtpm socket --tpmstate dir="$WORK/tpm" \
   --pid file="$WORK/swtpm.pid" --daemon
 cp /usr/share/OVMF/OVMF_VARS_4M.ms.fd "$WORK/OVMF_VARS.fd"
 
+echo "Installing. Console is on this terminal; if it seems stuck, attach a VNC"
+echo "client to localhost:5901 (e.g. 'vncviewer :1') to see any Setup dialog."
 qemu-system-x86_64 \
   -enable-kvm -machine q35,smm=on -cpu host -m 4096 -smp 2 \
   -global driver=cfi.pflash01,property=secure,value=on \
@@ -49,6 +58,6 @@ qemu-system-x86_64 \
   -drive file="$WORK/unattend.iso",media=cdrom,if=none,id=cd1 \
   -device ide-cd,drive=cd1,bus=ahci0.2 \
   -nic none \
-  -boot once=d -nographic -serial mon:stdio
+  -boot once=d -nographic -serial mon:stdio -vnc :1
 
-echo "QEMU exited. Run ./verify.sh $DISK to confirm before shipping the disk."
+echo "QEMU exited. Run $SCRIPT_DIR/verify.sh $DISK to confirm before shipping the disk."
