@@ -35,9 +35,23 @@ Full details, troubleshooting, and the reasoning behind the design are in
 
 ## Notes
 
-- The local account `Admin` is created with the placeholder password
-  `ChangeMe123!` from `unattend.xml`. **Set your own password in `unattend.xml`
-  before running `install.sh`**, and change it again after the first real login.
+- **Default credentials:** the local account `Admin` is created with the
+  placeholder password `ChangeMe123!`. It appears in two places in
+  `unattend.xml` (the `LocalAccount` block and the matching `AutoLogon` block).
+
+  **Change it before running `install.sh`:**
+
+  ```bash
+  sed -i 's|ChangeMe123!|YourNewPassword|g' unattend.xml   # replaces both occurrences
+  grep -c 'YourNewPassword' unattend.xml                   # should print 2
+  ```
+
+  (If your password contains `|`, `&` or `\`, edit the two `<Value>` lines by
+  hand instead.) Don't commit a real password: `unattend.xml` stores it in
+  plaintext.
+
+  **Change it again after first login:** in an elevated Command Prompt run
+  `net user Admin *`, or use Settings → Accounts → Sign-in options → Password.
 - If `verify.sh` shows "no bootable device", the install has not necessarily failed.
   It boots from a blank OVMF varstore with no NVRAM boot entry, so it relies on the
   UEFI removable fallback `\EFI\Boot\BOOTX64.EFI`, which Windows does not always
